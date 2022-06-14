@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# import os
+import os
 from torch.utils.data import Dataset
 # import zipfile
 
@@ -51,9 +51,6 @@ class KEELDatasetAttribute:
                     ', ' + str(self.max) + ']'
                 )
             return out
-
-    def is_output(self):
-        return self._is_output
 
 
 class KEELDataset(Dataset):
@@ -123,6 +120,9 @@ class KEELDataset(Dataset):
 
         # return data, label
 
+
+# Test
+for 
 dataset = KEELDataset('.tmp/iris0.dat')
 
 

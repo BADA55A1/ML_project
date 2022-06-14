@@ -50,7 +50,7 @@ class KEELDatasetAttribute:
                     '" is out of limits [' + str(self.min) +
                     ', ' + str(self.max) + ']'
                 )
-            return 
+            return out
 
     def is_output(self):
         return self._is_output

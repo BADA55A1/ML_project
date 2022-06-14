@@ -42,7 +42,15 @@ class KEELDatasetAttribute:
         if self.type is bool:
             return input == 'positive'
         else:
-            return self.type(input)
+            out = self.type(input)
+            if out < self.min or out > self.max:
+                raise Exception(
+                    'Value ' + input +
+                    ' for attribute "' + self.name + 
+                    '" is out of limits [' + str(self.min) +
+                    ', ' + str(self.max) + ']'
+                )
+            return 
 
     def is_output(self):
         return self._is_output

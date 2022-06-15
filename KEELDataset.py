@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os
+import os, random
 from torch.utils.data import Dataset
 # import zipfile
 
@@ -139,6 +139,15 @@ class KEELDataset(Dataset):
                         ', expected ' + str(sample_len_t)
                 )
 
+    # Dataset preparation methods:
+    def shuffle(self, seed = None):
+        if seed is not None:
+            random.seed(seed)
+        random.shuffle(self.dataset)
+
+    
+
+    # Access methods:
     def attribute_n(self):
         return len(self.attributes)
 
@@ -164,20 +173,13 @@ class KEELDataset(Dataset):
         data = self.dataset[idx][:-1]
         label = self.dataset[idx][-1]
         return data, label
-        # data = self.dataset[idx]
-        # if self.transform:
-        #     data = self.transform(data)
-
-        # label = self.dataset_class[idx]
-        # if self.target_transform:
-        #     label = self.target_transform(label)
-
-        # return data, label
 
 
 # Test
 dataset = KEELDataset('data/yeast1.dat')
 # dataset.check()
+print(dataset.getitem(5) )
+dataset.shuffle(1)
 print(dataset.getitem(5) )
 
 # Parse all data files

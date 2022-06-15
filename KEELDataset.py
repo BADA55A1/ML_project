@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, random
+import os, random, copy
 from torch.utils.data import Dataset
 # import zipfile
 
@@ -145,7 +145,57 @@ class KEELDataset(Dataset):
             random.seed(seed)
         random.shuffle(self.dataset)
 
-    
+    def generate_sets(self, train_percent, number_of_folds = None):
+        training = copy.copy(self)
+        test = copy.copy(self)
+
+        # bez wspoldzielonych list cech:
+        # training = copy.deepcopy(self)
+        # test = copy.deepcopy(self)
+
+        training_len = int(len(self) / 100 * train_percent)
+
+        training.dataset = copy.deepcopy(
+            self.dataset[0:training_len]
+        )
+        test.dataset = copy.deepcopy(
+            self.dataset[training_len:-1]
+        )
+
+        if number_of_folds is None:
+            return training, test
+
+        else:
+            fold_len = int(training_len / number_of_folds)
+
+            out = [[training, test]]
+            for i in range(number_of_folds):
+                training_t = copy.copy(self)
+                validation = copy.copy(self)
+
+                training_t.dataset = copy.deepcopy(
+                    self.dataset[
+                        0:i*fold_len
+                    ]
+                    +
+                    self.dataset[
+                        (i+1)*fold_len:training_len
+                    ]
+                )
+
+                validation.dataset = copy.deepcopy(
+                    self.dataset[
+                        i*fold_len:(i+1)*fold_len
+                    ]
+                )
+
+                out.append([training_t, validation])
+            return out
+
+
+
+
+        
 
     # Access methods:
     def attribute_n(self):
@@ -175,16 +225,37 @@ class KEELDataset(Dataset):
         return data, label
 
 
+
+#######################
+# DO WYWALENIA:
+#######################
+
+# Typowe zastosowanie:
+# zainicjuj
+dataset = KEELDataset('data/yeast1.dat')
+# wymieszaj
+dataset.shuffle(666)
+# podziel na datasety
+split_sets = dataset.generate_sets(80, 10)
+
+
 # Test
 dataset = KEELDataset('data/yeast1.dat')
-# dataset.check()
+dataset.check()
 print(dataset.getitem(5) )
 dataset.shuffle(1)
 print(dataset.getitem(5) )
+split_sets = dataset.generate_sets(80, 10)
+
+for set_paire in split_sets:
+    print(len(set_paire[0]), len(set_paire[1]))
+    print(set_paire[0].getitem(0))
+    print(set_paire[1].getitem(-1))
 
 # Parse all data files
 data_files = [os.path.join('./data', f) for f in os.listdir('./data') if os.path.isfile(os.path.join('./data', f))]
 for file_path in data_files:
     print(file_path)
     dataset = KEELDataset(file_path)
+    dataset.generate_sets(77, 18)
 

@@ -19,13 +19,16 @@ class KEELDatasetAttribute:
                 self.type = int
             elif type_str == 'real':
                 self.type = float
+            elif type_str.startswith('{0,'):
+                self.type = bool
             else:
                 raise Exception('unknown @attribute type: ' + line)
 
-            limits_str = line.split('[', 1)[1].split(']')[0]
-            limits_str = limits_str.split(',')
-            self.min = self.type(limits_str[0].strip())
-            self.max = self.type(limits_str[1].strip())
+            if self.type is not bool:
+                limits_str = line.split('[', 1)[1].split(']')[0]
+                limits_str = limits_str.split(',')
+                self.min = self.type(limits_str[0].strip())
+                self.max = self.type(limits_str[1].strip())
         else:
             raise Exception('not an @attribute string: ' + line)
 
@@ -34,13 +37,16 @@ class KEELDatasetAttribute:
 
     def convert(self, input):
         out = self.type(input)
-        if out < self.min or out > self.max:
-            raise Exception(
-                'Value ' + input +
-                ' for attribute "' + self.name + 
-                '" is out of limits [' + str(self.min) +
-                ', ' + str(self.max) + ']'
-            )
+        
+        if self.type is not bool:
+            if out < self.min or out > self.max:
+                raise Exception(
+                    'Value ' + input +
+                    ' for attribute "' + self.name + 
+                    '" is out of limits [' + str(self.min) +
+                    ', ' + str(self.max) + ']'
+                )
+
         return out
 
 
@@ -81,9 +87,9 @@ class KEELDataset(Dataset):
 
                     elif line.startswith('@attribute'):
                         if line.split(' ')[1].strip().lower() == 'class':
-                            self.classes = KEELDatasetClass(line)
+                            self.classes = KEELDatasetClass(line.strip())
                         else:
-                            self.attributes.append(KEELDatasetAttribute(line))
+                            self.attributes.append(KEELDatasetAttribute(line.strip()))
 
                     elif line.startswith('@data'):
                         data_started = True

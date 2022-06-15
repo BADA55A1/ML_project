@@ -10,54 +10,65 @@ class KEELDatasetAttribute:
         self.type = None
         self.min = None
         self.max = None
-        self.is_output = False
 
         if line.startswith('@attribute'):
             self.name = line.split(' ')[1].strip()
 
-            if self.name == 'Class':
-                self.type = bool
-                self.is_output = True
-            
+            type_str = line.split(' ')[2]
+            if type_str == 'integer':
+                self.type = int
+            elif type_str == 'real':
+                self.type = float
             else:
-                type_str = line.split(' ')[2]
-                if type_str == 'integer':
-                    self.type = int
-                elif type_str == 'real':
-                    self.type = float
-                else:
-                    raise Exception('unknown @attribute type: ' + line)
+                raise Exception('unknown @attribute type: ' + line)
 
-                limits_str = line.split('[', 1)[1].split(']')[0]
-                limits_str = limits_str.split(',')
-                self.min = self.type(limits_str[0].strip())
-                self.max = self.type(limits_str[1].strip())
+            limits_str = line.split('[', 1)[1].split(']')[0]
+            limits_str = limits_str.split(',')
+            self.min = self.type(limits_str[0].strip())
+            self.max = self.type(limits_str[1].strip())
         else:
             raise Exception('not an @attribute string: ' + line)
 
     def print(self):
-        print(self.name, self.type, self.min, self.max, self.is_output)
+        print(self.name, self.type, self.min, self.max)
 
     def convert(self, input):
-        if self.type is bool:
-            return input == 'positive'
-        else:
-            out = self.type(input)
-            if out < self.min or out > self.max:
-                raise Exception(
-                    'Value ' + input +
-                    ' for attribute "' + self.name + 
-                    '" is out of limits [' + str(self.min) +
-                    ', ' + str(self.max) + ']'
-                )
-            return out
+        out = self.type(input)
+        if out < self.min or out > self.max:
+            raise Exception(
+                'Value ' + input +
+                ' for attribute "' + self.name + 
+                '" is out of limits [' + str(self.min) +
+                ', ' + str(self.max) + ']'
+            )
+        return out
+
+
+class KEELDatasetClass:
+    def __init__(self, line):
+        classes_str = line.split('{', 1)[1].split('}')[0]
+        classes = classes_str.split(',')
+
+        self.classes = {}
+        self.classes_n = len(classes)
+        self.classes_representation = [0] * self.classes_n
+
+        for i in range(self.classes_n):
+            self.classes[classes[i].strip()] = i
+
+    def convert(self, value):
+        class_index = self.classes[value.strip()]
+        self.classes_representation[class_index] += 1
+        return class_index
+
 
 
 class KEELDataset(Dataset):
     def __init__(self, data_path):
         self.name = None
-        self.dataset = {}
-        self.attributes = {}
+        self.attributes = []
+        self.dataset = []
+        self.classes = None
 
         with open(data_path, "r") as datastream:
             data_started = False
@@ -67,49 +78,86 @@ class KEELDataset(Dataset):
                 if not data_started:
                     if line.startswith('@relation'):
                         self.name = line.split(' ')[1].strip()
+
                     elif line.startswith('@attribute'):
-                        attribute = KEELDatasetAttribute(line)
-                        self.attributes[attribute.name] = attribute
-                        self.dataset[attribute.name] = []
+                        if line.split(' ')[1].strip().lower() == 'class':
+                            self.classes = KEELDatasetClass(line)
+                        else:
+                            self.attributes.append(KEELDatasetAttribute(line))
+
                     elif line.startswith('@data'):
                         data_started = True
+
+                    elif line.startswith('@inputs') or line.startswith('@outputs') or line.startswith('@input') or line.startswith('@output'):
+                        pass
                     else:
                         print('unknown header line: ' + line)
                         # raise Exception('unknown header line: ' + line)
 
                 # Data reading:
                 else:
-                    attributes = list(self.attributes.values() )
                     data = line.strip().split(',')
 
-                    for i in range(len(data) ):
-                        self.dataset[attributes[i].name].append(
-                            attributes[i].convert(data[i])
+                    sample = []
+                    
+                    for i in range(len(data) - 1):
+                        sample.append(
+                            self.attributes[i].convert(data[i])
                         )
-        # Checking:
-        for attribute in self.attributes:
-            self.attributes[attribute].print()
-        
-        data_len_t = len(self)
-        for attribute in self.dataset:
-            if len(self.dataset[attribute]) != data_len_t:
-                raise Exception(
-                        'data length for attribute "' + attribute + 
-                        '" is ' + str(len(self.dataset[attribute]) ) +
-                        ', expected ' + str(data_len_t)
-                    )
-        print('dataset length:', data_len_t)
 
+                    sample.append(
+                        self.classes.convert(
+                            data[len(data) - 1]
+                        )
+                    )
+
+                    self.dataset.append(sample)
+                  
+        # Checking:  
+    def check(self):
+        print('attribute_n:', self.attribute_n())
+        print('inputs_metadata:', self.inputs_metadata())
+        print('classes_n:', self.classes_n())
+        print('classes_names:', self.classes_names())
+        print('classes_representation:', self.classes_representation())
+        print('__len__:', self.__len__())
+
+        for attribute in self.attributes:
+            attribute.print()
+        
+        sample_len_t = self.attribute_n() + 1
+        for sample in self.dataset:
+            if len(sample) != sample_len_t:
+                raise Exception(
+                        'Wrong data length for sample "' + str(sample) + 
+                        ', expected ' + str(sample_len_t)
+                )
+
+    def attribute_n(self):
+        return len(self.attributes)
+
+    def inputs_metadata(self):
+        return self.attributes
+
+    def classes_n(self):
+        return self.classes.classes_n
+
+    def classes_names(self):
+        return list(self.classes.classes)
+
+    def classes_representation(self):
+        return self.classes.classes_representation
+
+    def getitem(self, idx):
+        return self.__getitem__(idx)
 
     def __len__(self):
-        return len(
-            self.dataset[
-                list(self.attributes)[0]
-            ]
-        )
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        pass
+        data = self.dataset[idx][:-1]
+        label = self.dataset[idx][-1]
+        return data, label
         # data = self.dataset[idx]
         # if self.transform:
         #     data = self.transform(data)
@@ -122,53 +170,13 @@ class KEELDataset(Dataset):
 
 
 # Test
-for 
-dataset = KEELDataset('.tmp/iris0.dat')
+dataset = KEELDataset('data/yeast1.dat')
+# dataset.check()
+print(dataset.getitem(5) )
 
-
-'''
-    def __init__(self, root, pack_zip_file, dataset_dir, test, transform=None, target_transform=None,
-                 cross_validation_k_nr=1):
-        self.transform, self.target_transform = transform, target_transform
-
-        cwd = os.path.dirname(__file__)
-        cwd_root = os.path.join(cwd, root)
-        pack_file = pack_zip_file[:-4]
-        cross_validation_k_nr = cross_validation_k_nr
-
-        if pack_file not in os.listdir(cwd_root):
-            with zipfile.ZipFile(os.path.join(cwd_root, pack_zip_file), 'r') as zip_ref:
-                zip_ref.extractall(cwd_root)
-
-        pack_rel_path = os.path.join(cwd_root, pack_file)
-
-        dataset_dir_rel_path = os.path.join(pack_rel_path, dataset_dir)
-
-        if dataset_dir + '-5-fold' not in os.listdir(dataset_dir_rel_path):
-            with zipfile.ZipFile(os.path.join(dataset_dir_rel_path, dataset_dir + '-5-fold.zip'),
-                                 'r') as zip_ref:  # todo not working for rar files
-                os.mkdir(os.path.join(dataset_dir_rel_path, dataset_dir))
-                zip_ref.extractall(os.path.join(dataset_dir_rel_path, dataset_dir))
-
-        self.dataset_metadata_path = os.path.join(dataset_dir_rel_path, dataset_dir + '-5-fold',
-                                                  dataset_dir + f'-names.txt')
-        if test:
-            self.dataset_path = os.path.join(dataset_dir_rel_path, dataset_dir + '-5-fold',
-                                             dataset_dir + f'-5-{cross_validation_k_nr}tst.dat')
-        else:
-            self.dataset_path = os.path.join(dataset_dir_rel_path, dataset_dir + '-5-fold',
-                                             dataset_dir + f'-5-{cross_validation_k_nr}tra.dat')
-
-        # TODO load data, formats ect. , best this should be lazy
-        self.dataset = []
-        self.dataset_class = []
-        # this are not necessary for network,
-        self.class_to_text_labels = {}
-        self.inputs_to_text_labels = {}
-        self.inputs_dimentions = {}
-
-
-dataset = KEELDataset('data', 'imb_IRhigherThan9p1.zip', 'yeast6', test=False)
-
-'''
+# Parse all data files
+data_files = [os.path.join('./data', f) for f in os.listdir('./data') if os.path.isfile(os.path.join('./data', f))]
+for file_path in data_files:
+    print(file_path)
+    dataset = KEELDataset(file_path)
 

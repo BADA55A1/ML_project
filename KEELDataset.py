@@ -2,6 +2,9 @@
 
 import os, random, copy
 from torch.utils.data import Dataset
+from sklearn.utils import shuffle
+
+
 # import zipfile
 
 class KEELDatasetAttribute:
@@ -37,12 +40,12 @@ class KEELDatasetAttribute:
 
     def convert(self, input):
         out = self.type(input)
-        
+
         if self.type is not bool:
             if out < self.min or out > self.max:
                 raise Exception(
                     'Value ' + input +
-                    ' for attribute "' + self.name + 
+                    ' for attribute "' + self.name +
                     '" is out of limits [' + str(self.min) +
                     ', ' + str(self.max) + ']'
                 )
@@ -68,58 +71,66 @@ class KEELDatasetClass:
         return class_index
 
 
-
 class KEELDataset(Dataset):
-    def __init__(self, data_path):
+    # returns if header is parsed
+    def parse_header_line(self, line):
+        if line.startswith('@relation'):
+            self.name = line.split(' ')[1].strip()
+
+        elif line.startswith('@attribute'):
+            if line.split(' ')[1].strip().lower() == 'class':
+                self.classes = KEELDatasetClass(line.strip())
+            else:
+                self.attributes.append(KEELDatasetAttribute(line.strip()))
+
+        elif line.startswith('@data'):
+            return True
+
+        elif line.startswith('@inputs') or line.startswith('@outputs') or line.startswith(
+                '@input') or line.startswith('@output'):
+            pass
+        else:
+            print('unknown header line: ' + line)
+        return False
+        # raise Exception('unknown header line: ' + line)
+
+    def parse_data_line(self, line):
+        data = line.strip().split(',')
+
+        sample = []
+
+        for i in range(len(data) - 1):
+            sample.append(
+                self.attributes[i].convert(data[i])
+            )
+
+        sample.append(
+            self.classes.convert(
+                data[len(data) - 1]
+            )
+        )
+
+        self.dataset.append(sample)
+
+    def __init__(self, data_path, transform=None, target_transform=None):
+        self.transform = transform
+        self.target_transform = target_transform
         self.name = None
         self.attributes = []
         self.dataset = []
         self.classes = None
 
         with open(data_path, "r") as datastream:
-            data_started = False
+            header_completed = False
             for line in datastream:
-
-                # Header reading:
-                if not data_started:
-                    if line.startswith('@relation'):
-                        self.name = line.split(' ')[1].strip()
-
-                    elif line.startswith('@attribute'):
-                        if line.split(' ')[1].strip().lower() == 'class':
-                            self.classes = KEELDatasetClass(line.strip())
-                        else:
-                            self.attributes.append(KEELDatasetAttribute(line.strip()))
-
-                    elif line.startswith('@data'):
-                        data_started = True
-
-                    elif line.startswith('@inputs') or line.startswith('@outputs') or line.startswith('@input') or line.startswith('@output'):
-                        pass
-                    else:
-                        print('unknown header line: ' + line)
-                        # raise Exception('unknown header line: ' + line)
-
-                # Data reading:
+                if header_completed:
+                    self.parse_data_line(line)
                 else:
-                    data = line.strip().split(',')
+                    header_completed = self.parse_header_line(line)
 
-                    sample = []
-                    
-                    for i in range(len(data) - 1):
-                        sample.append(
-                            self.attributes[i].convert(data[i])
-                        )
+        #print(self.dataset)
+        # Checking:
 
-                    sample.append(
-                        self.classes.convert(
-                            data[len(data) - 1]
-                        )
-                    )
-
-                    self.dataset.append(sample)
-                  
-        # Checking:  
     def check(self):
         print('attribute_n:', self.attribute_n())
         print('inputs_metadata:', self.inputs_metadata())
@@ -130,72 +141,57 @@ class KEELDataset(Dataset):
 
         for attribute in self.attributes:
             attribute.print()
-        
+
         sample_len_t = self.attribute_n() + 1
         for sample in self.dataset:
             if len(sample) != sample_len_t:
                 raise Exception(
-                        'Wrong data length for sample "' + str(sample) + 
-                        ', expected ' + str(sample_len_t)
+                    'Wrong data length for sample "' + str(sample) +
+                    ', expected ' + str(sample_len_t)
                 )
 
     # Dataset preparation methods:
-    def shuffle(self, seed = None):
+    def shuffle(self, seed=None):
         if seed is not None:
             random.seed(seed)
         random.shuffle(self.dataset)
 
-    def generate_sets(self, train_percent, number_of_folds = None):
-        training = copy.copy(self)
-        test = copy.copy(self)
+    def generate_sets(self, validation_factor=0,
+                      number_of_folds=1):  # TODO for 1 folds there is only test dataset should be training
 
         # bez wspoldzielonych list cech:
         # training = copy.deepcopy(self)
         # test = copy.deepcopy(self)
+        fold_len = len(self.dataset) // number_of_folds
+        validation_len = int(fold_len * validation_factor)
 
-        training_len = int(len(self) / 100 * train_percent)
+        out = []
+        for i in range(number_of_folds):
+            training_t = copy.copy(self)
+            test = copy.copy(self)
+            validation = copy.copy(self)
 
-        training.dataset = copy.deepcopy(
-            self.dataset[0:training_len]
-        )
-        test.dataset = copy.deepcopy(
-            self.dataset[training_len:-1]
-        )
+            training_t.dataset = copy.deepcopy(
+                self.dataset[:i * fold_len]
+                +
+                self.dataset[(i + 1) * fold_len:]
+            )
+            validation.dataset = []
 
-        if number_of_folds is None:
-            return training, test
-
-        else:
-            fold_len = int(training_len / number_of_folds)
-
-            out = [[training, test]]
-            for i in range(number_of_folds):
-                training_t = copy.copy(self)
-                validation = copy.copy(self)
-
-                training_t.dataset = copy.deepcopy(
-                    self.dataset[
-                        0:i*fold_len
-                    ]
-                    +
-                    self.dataset[
-                        (i+1)*fold_len:training_len
-                    ]
-                )
-
+            if validation_len != 0:
                 validation.dataset = copy.deepcopy(
-                    self.dataset[
-                        i*fold_len:(i+1)*fold_len
-                    ]
+                    training_t.dataset[:validation_len]
+                )
+                training_t.dataset = copy.deepcopy(
+                    training_t.dataset[validation_len:]
                 )
 
-                out.append([training_t, validation])
-            return out
+            test.dataset = copy.deepcopy(
+                self.dataset[i * fold_len:(i + 1) * fold_len]
+            )
 
-
-
-
-        
+            out.append([training_t, validation, test])
+        return out
 
     # Access methods:
     def attribute_n(self):
@@ -221,9 +217,12 @@ class KEELDataset(Dataset):
 
     def __getitem__(self, idx):
         data = self.dataset[idx][:-1]
+        if self.transform is not None:
+            data = self.transform(data)
         label = self.dataset[idx][-1]
+        if self.target_transform is not None:
+            label = self.target_transform(label)
         return data, label
-
 
 
 #######################
@@ -232,30 +231,27 @@ class KEELDataset(Dataset):
 
 # Typowe zastosowanie:
 # zainicjuj
-dataset = KEELDataset('data/yeast1.dat')
+dataset = KEELDataset('./data/yeast.dat')
 # wymieszaj
 dataset.shuffle(666)
 # podziel na datasety
-split_sets = dataset.generate_sets(80, 10)
-
+split_sets = dataset.generate_sets(0, 1)
 
 # Test
-dataset = KEELDataset('data/yeast1.dat')
-dataset.check()
-print(dataset.getitem(5) )
+dataset = KEELDataset('data/yeast.dat')
+#dataset.check()
 dataset.shuffle(1)
-print(dataset.getitem(5) )
-split_sets = dataset.generate_sets(80, 10)
+split_sets = dataset.generate_sets(2, 2)
 
-for set_paire in split_sets:
-    print(len(set_paire[0]), len(set_paire[1]))
-    print(set_paire[0].getitem(0))
-    print(set_paire[1].getitem(-1))
+#for set_paire in split_sets:
+    #print(len(set_paire[0].dataset), len(set_paire[1].dataset), len(set_paire[2].dataset))
+    #print(set_paire[0].getitem(0))
+    #print(set_paire[1].getitem(-1))
 
 # Parse all data files
 data_files = [os.path.join('./data', f) for f in os.listdir('./data') if os.path.isfile(os.path.join('./data', f))]
-for file_path in data_files:
-    print(file_path)
-    dataset = KEELDataset(file_path)
-    dataset.generate_sets(77, 18)
+#for file_path in data_files:
+    #print(file_path)
+#    dataset = KEELDataset(file_path)
+#    dataset.generate_sets(77, 18)
 

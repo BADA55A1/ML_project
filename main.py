@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import operator
 
 import scipy
@@ -242,7 +244,7 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
             optimizer.zero_grad()
 
         ## TODO  save running results here & plot in on same plot as second running
-        # print(f'valid: [{epoch + 1}] loss: {train_running_loss :.5f}')
+        # print(f'valid: [{epoch + 1}] loss: {validation_running_loss :.5f}')
         # TODO we need it only for one fold run of this function
 
 
@@ -262,10 +264,11 @@ def main():
     transforms = torch.FloatTensor
 
     data_files = [os.path.join('./data', f) for f in os.listdir('./data') if os.path.isfile(os.path.join('./data', f))]
-    for i in data_files:
-        print(i)
-        dataset = KEELDataset(i, transforms)  # , transform)
-
+    print('Dataset files:', data_files)
+    for f in data_files:
+        print('Running for dataset: ', f)
+        dataset = KEELDataset(f, transforms)  # , transform)
+        dataset.shuffle(1)
         run_experiment(dataset)
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:

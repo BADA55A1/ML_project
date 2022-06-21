@@ -190,9 +190,10 @@ def run_experiment(dataset, folds_number=5):
         # print(results)
     results = get_t_student_stats(results)
     print(results)
+    # TODO save results here & calc indicators mentioned in docs
+    # TODO for all results there should be indcator of what method is it and what dataset
     # scipy.stats.ttest_rel(results[methods[0]], results[methods[1]])
     # print(t_stud_p, t_stud_avg)
-    # TODO save results and do computation there?
 
 
 def run_validation_fold(trainset, validationset, testset, method='baseline'):
@@ -219,8 +220,12 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
             optimizer.step()
 
             # print statistics
-            train_running_loss += loss.item()  # TODO correct this for scale
+            train_running_loss += loss.item()  # TODO Lukasz correct this for scale
+
+        ## TODO  save running results here & plot in on same plot as second running
         # print(f'train: [{epoch + 1}] loss: {train_running_loss :.5f}')
+        # TODO we need it only for one fold run of this function
+
         if epoch % 10 == 0:
             correct, total = get_summary(net, trainloader)
             # print_summary(correct, total)
@@ -233,9 +238,14 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
             outputs = net(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
-            validation_running_loss += loss.item()  # TODO correct this for scale
+            validation_running_loss += loss.item()  # TODO for Lukasz correct this for scale
             optimizer.zero_grad()
+
+        ## TODO  save running results here & plot in on same plot as second running
         # print(f'valid: [{epoch + 1}] loss: {train_running_loss :.5f}')
+        # TODO we need it only for one fold run of this function
+
+
         if epoch % 10 == 0:
             correct, total = get_summary(net, validationloader)
             # print_summary(correct, total)

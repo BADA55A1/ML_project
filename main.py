@@ -10,7 +10,7 @@ import scipy.stats
 import torch
 
 import ssl
-
+import json
 import os
 
 from torch.utils.data import WeightedRandomSampler, RandomSampler
@@ -25,7 +25,7 @@ import numpy as np
 import torch.optim as optim
 import torch.nn as nn
 
-SIM_LEN = 3
+SIM_LEN = 5
 
 
 def get_summary(net, testloader):
@@ -150,7 +150,7 @@ def get_t_student_stats(results):
     class_names = [class_name for class_name in results['baseline'][0][1][0]]
     matrix = {method: {class_name: [[], [], [], []] for class_name in class_names} for method in results}
     total = []
-    print(results)
+    # print(results)
 
     for method in results:
         for run_nr in range(len(results[method])):
@@ -177,10 +177,14 @@ def get_t_student_stats(results):
             acc_class_ret[class_name][matrix_cell] = [avg(matrix['baseline'][class_name][matrix_cell]),
                                                       avg(matrix['oversampling'][class_name][matrix_cell]), t_v]
 
-    return {'acc': [avg(acc['baseline']),
-                    avg(acc['oversampling']), acc_t],
-            'total': total[0],  # total is always the same (and should be)
-            'matrix': acc_class_ret
+    return {
+                'acc': [
+                    avg(acc['baseline']),
+                    avg(acc['oversampling']),
+                    {'statistic': acc_t.statistic, 'pvalue': acc_t.pvalue}
+                ],
+                'total': total[0],  # total is always the same (and should be)
+                'matrix': acc_class_ret
             }
 
 
@@ -191,18 +195,30 @@ def run_experiment(dataset, folds_number=5):
         dataset.shuffle(i+1)
         generated_sets = dataset.generate_sets(0.05, folds_number)
         for method in methods:
-            results[method].extend([run_validation_fold(trainset, validationset, testset, method=method) for
-                                    trainset, validationset, testset in generated_sets])
+            res = []
+            for i in range( len(generated_sets) ):
+                trainset, validationset, testset = generated_sets[i]
+                metrics_file = None
+                if i == 0:
+                    metrics_file = 'metric' + '_' + dataset.name + '_' + method
+                res.append(
+                    run_validation_fold(trainset, validationset, testset, method=method, metrics_file=metrics_file)
+                )
+            results[method].extend(res)
         # print(results)
     results = get_t_student_stats(results)
-    print(results)
+    # print(results)
+
+    res_file = 'out/res' + '_' + dataset.name + '.json'
+    with open(res_file, 'w') as outfile:
+        json.dump(results, outfile)
     # TODO save results here & calc indicators mentioned in docs
     # TODO for all results there should be indcator of  what dataset
     # scipy.stats.ttest_rel(results[methods[0]], results[methods[1]])
     # print(t_stud_p, t_stud_avg)
 
 
-def run_validation_fold(trainset, validationset, testset, method='baseline'):
+def run_validation_fold(trainset, validationset, testset, method='baseline', metrics_file=None):
     classes = [key for key, value in sorted(trainset.classes.classes.items(), key=operator.itemgetter(1))]
 
     net = get_network(len(trainset), trainset.attribute_n(), trainset.classes_n(), 2.5)
@@ -210,6 +226,7 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
     trainloader, testloader, validationloader = get_loaders(trainset, testset, validationset, method=method)
+    metrics = {'train': [], 'valid': []}
     for epoch in range(SIM_LEN):  # loop over the dataset multiple times
         train_running_loss = 0.0
         for i, data in enumerate(trainloader):
@@ -230,6 +247,8 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
 
         ## TODO  save running results here & plot in on same plot as second running
         # print(f'train: [{epoch + 1}] loss: {train_running_loss :.5f}')
+        if metrics_file is not None:
+            metrics['train'].append(train_running_loss)
         # TODO we need it only for one fold run of this function
 
         if epoch % 10 == 0:
@@ -249,6 +268,8 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
 
         ## TODO  save running results here & plot in on same plot as second running
         # print(f'valid: [{epoch + 1}] loss: {validation_running_loss :.5f}')
+        if metrics_file is not None:
+            metrics['valid'].append(validation_running_loss)
         # TODO we need it only for one fold run of this function
 
 
@@ -257,6 +278,11 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
             # print_summary(correct, total)
 
     # print('Finished Training')
+    if metrics_file is not None:
+        # print(metrics)
+        metrics_file = 'out/' + metrics_file + '.json'
+        with open(metrics_file, 'w') as outfile:
+            json.dump(metrics, outfile)
 
     correct, total = get_summary(net, testloader)
     matrix, total_m = get_detailed_summary(net, testloader, classes)

@@ -72,7 +72,7 @@ class KEELDatasetClass:
 
 
 class KEELDataset(Dataset):
-    # returns if header is parsed
+    # returns True if header is parsed
     def parse_header_line(self, line):
         if line.startswith('@relation'):
             self.name = line.split(' ')[1].strip()

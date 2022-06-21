@@ -36,6 +36,7 @@ def get_summary(net, testloader):
             correct += (predicted == labels).sum().item()
     return correct, total
 
+
 def print_summary(correct, total):
     print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
 
@@ -134,39 +135,49 @@ def save_running_stats():
 
 
 def avg(arr):
-    return sum(arr)/len(arr)
+    return sum(arr) / len(arr)
 
 
 def get_t_student_stats(results):
-    acc = {method:[] for method in results}
-    class_names= [ class_name for class_name in results['baseline'][0][1][0]]
-    true_positive = {method:{class_name: [] for class_name in class_names} for method in results}
-
+    acc = {method: [] for method in results}
+    class_names = [class_name for class_name in results['baseline'][0][1][0]]
+    matrix = {method: {class_name: [[],[],[],[]] for class_name in class_names} for method in results}
+    total = []
+    print(results)
 
     for method in results:
         #
         for run_nr in range(len(results[method])):
             # acc (hits)
-            acc[method].append(results[method][run_nr][0][0]) # this are hits change naming
+            acc[method].append(results[method][run_nr][0][0])  # this are hits change naming
+            total.append(results[method][run_nr][0][1])  # this are hits change naming
 
             for class_name in class_names:
-                true_positive[method][class_name].append(results[method][run_nr][1][0][class_name][0])
+                for matrix_cell in range(len(results[method][run_nr][1][0][class_name])):
+                    matrix[method][class_name][matrix_cell].append(results[method][run_nr][1][0][class_name][matrix_cell])
 
             # TODO get rest of stats as t student
 
     # matrix
     acc_t = scipy.stats.ttest_rel(acc['baseline'], acc['oversampling'])
     acc_class_ret = {}
+    ## TruePositive, TN, FP, FN
     for class_name in class_names:
-        t_v = scipy.stats.ttest_rel(
-            true_positive['baseline'][class_name],
-            true_positive['oversampling'][class_name]
-        )
-        acc_class_ret[class_name] = [avg(true_positive['baseline'][class_name]), avg(true_positive['oversampling'][class_name]), t_v],
+        acc_class_ret[class_name] = [0,0,0,0]
+        for matrix_cell in range(len(matrix['baseline'][class_name])):
+            t_v = scipy.stats.ttest_rel(
+                matrix['baseline'][class_name][matrix_cell],
+                matrix['oversampling'][class_name][matrix_cell]
+            )
+            acc_class_ret[class_name][matrix_cell] = [avg(matrix['baseline'][class_name][matrix_cell]),
+                                         avg(matrix['oversampling'][class_name][matrix_cell]), t_v],
 
-    return {'acc' : [avg(acc['baseline']), avg(acc['oversampling']), acc_t],
-            'true_positive': acc_class_ret
+    return {'acc': [avg(acc['baseline']),
+                    avg(acc['oversampling']), acc_t],
+            'total': total[0], # total is always the same
+            'matrix': acc_class_ret
             }
+
 
 def run_experiment(dataset, folds_number=5):
     methods = ['baseline', 'oversampling']
@@ -174,16 +185,14 @@ def run_experiment(dataset, folds_number=5):
     for i in range(2):
         generated_sets = dataset.generate_sets(0.05, folds_number)
         for method in methods:
-            results[method].extend([run_validation_fold(trainset, validationset, testset, method=method) for trainset, validationset, testset in generated_sets])
-        #print(results)
+            results[method].extend([run_validation_fold(trainset, validationset, testset, method=method) for
+                                    trainset, validationset, testset in generated_sets])
+        # print(results)
     results = get_t_student_stats(results)
     print(results)
-    #scipy.stats.ttest_rel(results[methods[0]], results[methods[1]])
-    #print(t_stud_p, t_stud_avg)
+    # scipy.stats.ttest_rel(results[methods[0]], results[methods[1]])
+    # print(t_stud_p, t_stud_avg)
     # TODO save results and do computation there?
-
-
-
 
 
 def run_validation_fold(trainset, validationset, testset, method='baseline'):
@@ -194,7 +203,7 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
     trainloader, testloader, validationloader = get_loaders(trainset, testset, validationset, method=method)
-    for epoch in range(100):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
         train_running_loss = 0.0
         for i, data in enumerate(trainloader):
             # get the inputs; data is a list of [inputs, labels]
@@ -211,10 +220,10 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
 
             # print statistics
             train_running_loss += loss.item()  # TODO correct this for scale
-        #print(f'train: [{epoch + 1}] loss: {train_running_loss :.5f}')
+        # print(f'train: [{epoch + 1}] loss: {train_running_loss :.5f}')
         if epoch % 10 == 0:
             correct, total = get_summary(net, trainloader)
-            #print_summary(correct, total)
+            # print_summary(correct, total)
 
         # validation
         validation_running_loss = 0
@@ -226,16 +235,16 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
             loss.backward()
             validation_running_loss += loss.item()  # TODO correct this for scale
             optimizer.zero_grad()
-        #print(f'valid: [{epoch + 1}] loss: {train_running_loss :.5f}')
+        # print(f'valid: [{epoch + 1}] loss: {train_running_loss :.5f}')
         if epoch % 10 == 0:
             correct, total = get_summary(net, validationloader)
-            #print_summary(correct, total)
+            # print_summary(correct, total)
 
-    #print('Finished Training')
+    # print('Finished Training')
 
     correct, total = get_summary(net, testloader)
     matrix, total_m = get_detailed_summary(net, testloader, classes)
-    #print_detailed_summary(matrix, total)
+    # print_detailed_summary(matrix, total)
     return (correct, total), (matrix, total_m)
 
 

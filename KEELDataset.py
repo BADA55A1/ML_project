@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-import os, random, copy
+import random
+import copy
 from torch.utils.data import Dataset
-from sklearn.utils import shuffle
 
 
 # import zipfile
@@ -167,9 +167,12 @@ class KEELDataset(Dataset):
 
         out = []
         for i in range(number_of_folds):
-            training_t = copy.copy(self)
-            test = copy.copy(self)
-            validation = copy.copy(self)
+            #training_t = copy.copy(self)
+            #test = copy.copy(self)
+            #validation = copy.copy(self)
+            training_t = copy.deepcopy(self)
+            test = copy.deepcopy(self)
+            validation = copy.deepcopy(self)
 
             training_t.dataset = copy.deepcopy(
                 self.dataset[:i * fold_len]
@@ -249,7 +252,6 @@ split_sets = dataset.generate_sets(2, 2)
     #print(set_paire[1].getitem(-1))
 
 # Parse all data files
-data_files = [os.path.join('./data', f) for f in os.listdir('./data') if os.path.isfile(os.path.join('./data', f))]
 #for file_path in data_files:
     #print(file_path)
 #    dataset = KEELDataset(file_path)

@@ -20,6 +20,8 @@ import numpy as np
 import torch.optim as optim
 import torch.nn as nn
 
+SIM_LEN = 200
+
 
 def get_summary(net, testloader):
     correct = 0
@@ -141,12 +143,11 @@ def avg(arr):
 def get_t_student_stats(results):
     acc = {method: [] for method in results}
     class_names = [class_name for class_name in results['baseline'][0][1][0]]
-    matrix = {method: {class_name: [[],[],[],[]] for class_name in class_names} for method in results}
+    matrix = {method: {class_name: [[], [], [], []] for class_name in class_names} for method in results}
     total = []
     print(results)
 
     for method in results:
-        #
         for run_nr in range(len(results[method])):
             # acc (hits)
             acc[method].append(results[method][run_nr][0][0])  # this are hits change naming
@@ -154,27 +155,26 @@ def get_t_student_stats(results):
 
             for class_name in class_names:
                 for matrix_cell in range(len(results[method][run_nr][1][0][class_name])):
-                    matrix[method][class_name][matrix_cell].append(results[method][run_nr][1][0][class_name][matrix_cell])
-
-            # TODO get rest of stats as t student
+                    matrix[method][class_name][matrix_cell].append(
+                        results[method][run_nr][1][0][class_name][matrix_cell])
 
     # matrix
     acc_t = scipy.stats.ttest_rel(acc['baseline'], acc['oversampling'])
     acc_class_ret = {}
     ## TruePositive, TN, FP, FN
     for class_name in class_names:
-        acc_class_ret[class_name] = [0,0,0,0]
+        acc_class_ret[class_name] = [[], [], [], []]
         for matrix_cell in range(len(matrix['baseline'][class_name])):
             t_v = scipy.stats.ttest_rel(
                 matrix['baseline'][class_name][matrix_cell],
                 matrix['oversampling'][class_name][matrix_cell]
             )
             acc_class_ret[class_name][matrix_cell] = [avg(matrix['baseline'][class_name][matrix_cell]),
-                                         avg(matrix['oversampling'][class_name][matrix_cell]), t_v],
+                                                      avg(matrix['oversampling'][class_name][matrix_cell]), t_v]
 
     return {'acc': [avg(acc['baseline']),
                     avg(acc['oversampling']), acc_t],
-            'total': total[0], # total is always the same
+            'total': total[0],  # total is always the same (and should be)
             'matrix': acc_class_ret
             }
 
@@ -203,7 +203,7 @@ def run_validation_fold(trainset, validationset, testset, method='baseline'):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
     trainloader, testloader, validationloader = get_loaders(trainset, testset, validationset, method=method)
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(SIM_LEN):  # loop over the dataset multiple times
         train_running_loss = 0.0
         for i, data in enumerate(trainloader):
             # get the inputs; data is a list of [inputs, labels]

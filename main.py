@@ -20,7 +20,7 @@ import numpy as np
 import torch.optim as optim
 import torch.nn as nn
 
-SIM_LEN = 200
+SIM_LEN = 3
 
 
 def get_summary(net, testloader):
@@ -191,7 +191,7 @@ def run_experiment(dataset, folds_number=5):
     results = get_t_student_stats(results)
     print(results)
     # TODO save results here & calc indicators mentioned in docs
-    # TODO for all results there should be indcator of what method is it and what dataset
+    # TODO for all results there should be indcator of  what dataset
     # scipy.stats.ttest_rel(results[methods[0]], results[methods[1]])
     # print(t_stud_p, t_stud_avg)
 

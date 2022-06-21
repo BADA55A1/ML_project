@@ -291,6 +291,9 @@ def run_validation_fold(trainset, validationset, testset, method='baseline', met
 
 
 def main():
+    if not os.path.exists('./out'):
+        os.makedirs('./out')
+
     transforms = torch.FloatTensor
 
     data_files = [os.path.join('./data', f) for f in os.listdir('./data') if os.path.isfile(os.path.join('./data', f))]

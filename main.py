@@ -138,7 +138,6 @@ def avg(arr):
 
 
 def get_t_student_stats(results):
-    t_student_results = [[]]
     acc = {method:[] for method in results}
     class_names= [ class_name for class_name in results['baseline'][0][1][0]]
     true_positive = {method:{class_name: [] for class_name in class_names} for method in results}

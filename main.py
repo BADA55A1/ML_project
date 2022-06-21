@@ -111,7 +111,7 @@ def get_loaders(trainset, testset, validationset, method='baseline', batch_size=
     elif method == 'oversampling':
         train_samples = [len(list(filter(lambda el: el[-1] == i, trainset.dataset))) for i in
                          range(trainset.classes_n())]
-        train_samples = [sum_of_weigths / i for i in train_samples]
+        train_samples = [0 if i == 0 else sum_of_weigths / i for i in train_samples]
         weights = [train_samples[datarow[-1]] for datarow in trainset.dataset]
 
         sampler = WeightedRandomSampler(weights, num_samples=int(sum_of_weigths), replacement=True)

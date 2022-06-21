@@ -1,4 +1,7 @@
 #!/usr/bin/python
+import random
+
+random.seed(1)
 
 import operator
 
@@ -185,6 +188,7 @@ def run_experiment(dataset, folds_number=5):
     methods = ['baseline', 'oversampling']
     results = {key: [] for key in methods}
     for i in range(2):
+        dataset.shuffle(i+1)
         generated_sets = dataset.generate_sets(0.05, folds_number)
         for method in methods:
             results[method].extend([run_validation_fold(trainset, validationset, testset, method=method) for
@@ -268,7 +272,6 @@ def main():
     for f in data_files:
         print('Running for dataset: ', f)
         dataset = KEELDataset(f, transforms)  # , transform)
-        dataset.shuffle(1)
         run_experiment(dataset)
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:

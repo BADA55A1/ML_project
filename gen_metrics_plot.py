@@ -11,35 +11,55 @@ for f in os.listdir('./out'):
 			datasets_list.append(dataset)
 		
 for i in range(len(datasets_list)):
-	print(i, datasets_list[i])
+	print(i + 1, datasets_list[i])
 
-print('Select dataset: ', end = '')
-dataset = datasets_list[int(input())]
+print('Select dataset (0=all): ', end = '')
 
-fig, axs = plt.subplots(2)
+choice = int(input())
 
-m_i = 0
-for f in os.listdir('./out'):
-	if f.startswith('metric_' + dataset + '_'):
-		method = f.split('.')[0].split('_')[2]
-		print(f, method)
+if choice != 0:
+	datasets_list = [datasets_list[choice - 1]]
 
-		with open(os.path.join('./out', f), 'r') as infile:
-			data = json.load(infile)
-			
-			line, = axs[m_i].plot(data["train"])
-			line.set_label('Training')
+print('Show or save to png? (1 for show): ', end = '')
+show = False
+if int(input()) == 1:
+	show = True
 
-			line, = axs[m_i].plot(data["valid"])
-			line.set_label('Validation')
+for dataset in datasets_list:
+	fig, axs = plt.subplots(2)
+	fig.set_figheight(8)  
+	fig.set_figwidth(8)
 
-			
-			axs[m_i].set_ylabel('loss')
-			axs[m_i].set_xlabel('epoch')
-			axs[m_i].set_title(method)
-			axs[m_i].legend()
+	m_i = 0
+	for f in os.listdir('./out'):
+		if f.startswith('metric_' + dataset + '_'):
+			method = f.split('.')[0].split('_')[-1]
+			# print(f, method)
 
-			m_i += 1
+			with open(os.path.join('./out', f), 'r') as infile:
+				data = json.load(infile)
+				
+				line, = axs[m_i].plot(data["train"])
+				line.set_label('Training')
 
-fig.suptitle(dataset, fontsize=16)
-plt.show()
+				line, = axs[m_i].plot(data["valid"])
+				line.set_label('Validation')
+
+				
+				axs[m_i].set_ylabel('loss')
+				axs[m_i].set_xlabel('epoch')
+				axs[m_i].set_title(method)
+				axs[m_i].legend()
+				# axs[m_i].set_aspect(60)
+
+				m_i += 1
+
+	fig.suptitle(dataset, fontsize=16)
+	plt.tight_layout()
+
+	if show:
+		plt.show()
+	else:
+		if not os.path.exists('./plots'):
+			os.makedirs('./plots')
+		fig.savefig('./plots/loss_' + dataset + '.png', dpi=300, orientation='portrait')

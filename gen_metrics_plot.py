@@ -18,6 +18,7 @@ dataset = datasets_list[int(input())]
 
 fig, axs = plt.subplots(2)
 
+m_i = 0
 for f in os.listdir('./out'):
 	if f.startswith('metric_' + dataset + '_'):
 		method = f.split('.')[0].split('_')[2]
@@ -26,20 +27,19 @@ for f in os.listdir('./out'):
 		with open(os.path.join('./out', f), 'r') as infile:
 			data = json.load(infile)
 			
-			line, = axs[0].plot(data["train"])
-			line.set_label(method)
+			line, = axs[m_i].plot(data["train"])
+			line.set_label('Training')
 
-			line, = axs[1].plot(data["valid"])
-			line.set_label(method)
+			line, = axs[m_i].plot(data["valid"])
+			line.set_label('Validation')
 
 			
-axs[0].set_ylabel('loss')			
-axs[1].set_ylabel('loss')
-axs[1].set_xlabel('epoch')
-axs[0].set_title('Training')
-axs[1].set_title('Validation')
-axs[0].legend()
-axs[1].legend()
+			axs[m_i].set_ylabel('loss')
+			axs[m_i].set_xlabel('epoch')
+			axs[m_i].set_title(method)
+			axs[m_i].legend()
+
+			m_i += 1
 
 fig.suptitle(dataset, fontsize=16)
 plt.show()

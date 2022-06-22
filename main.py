@@ -25,7 +25,7 @@ import numpy as np
 import torch.optim as optim
 import torch.nn as nn
 
-SIM_LEN = 5
+SIM_LEN = 450
 
 
 def get_summary(net, testloader):
@@ -192,11 +192,13 @@ def run_experiment(dataset, folds_number=5):
     methods = ['baseline', 'oversampling']
     results = {key: [] for key in methods}
     for i in range(2):
+        print('### Run', i, '        ')
         dataset.shuffle(i+1)
         generated_sets = dataset.generate_sets(0.05, folds_number)
         for method in methods:
             res = []
             for i in range( len(generated_sets) ):
+                print('method:', method, 'fold:', i, '        ')
                 trainset, validationset, testset = generated_sets[i]
                 metrics_file = None
                 if i == 0:
@@ -229,6 +231,7 @@ def run_validation_fold(trainset, validationset, testset, method='baseline', met
     metrics = {'train': [], 'valid': []}
     for epoch in range(SIM_LEN):  # loop over the dataset multiple times
         train_running_loss = 0.0
+        print('epoch:', epoch, end = '\r')
         for i, data in enumerate(trainloader):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data

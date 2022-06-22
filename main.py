@@ -246,7 +246,7 @@ def run_validation_fold(trainset, validationset, testset, method='baseline', met
             optimizer.step()
 
             # print statistics
-            train_running_loss += loss.item()  # TODO Lukasz correct this for scale
+            train_running_loss += loss.item()/len(trainloader)  # TODO Lukasz correct this for scale
 
         ## TODO  save running results here & plot in on same plot as second running
         # print(f'train: [{epoch + 1}] loss: {train_running_loss :.5f}')
@@ -266,7 +266,7 @@ def run_validation_fold(trainset, validationset, testset, method='baseline', met
             outputs = net(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
-            validation_running_loss += loss.item()  # TODO for Lukasz correct this for scale
+            validation_running_loss += loss.item()/len(validationloader)  # TODO for Lukasz correct this for scale
             optimizer.zero_grad()
 
         ## TODO  save running results here & plot in on same plot as second running
